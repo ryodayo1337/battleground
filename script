@@ -1,0 +1,91 @@
+local Library = loadstring(Game:HttpGet("https://raw.githubusercontent.com/bloodball/-back-ups-for-libs/main/wizard"))()
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+ 
+local PhantomForcesWindow = Library:NewWindow("Combat")
+local KillingCheats = PhantomForcesWindow:NewSection("Kill Options")
+ 
+local detectionRange = 20000000 -- プレイヤーを検出する範囲
+local teleportInterval = 1 -- テレポートの間隔（秒）
+local isTeleporting = false -- テレポート中かどうかのフラグ
+local teleportIntervalSliderValue = 15 -- デフォルトのテレポート間隔
+local teleportDestination = Vector3.new(-90, 205, -568) -- テレポート先の座標
+ 
+local function teleportBelowPlayer(player)
+    -- プレイヤーの位置を取得する
+    local playerPosition = player.Character.HumanoidRootPart.Position
+    
+    -- テレポート先の位置を計算する（プレイヤーの少し下に移動する）
+    local teleportPosition = playerPosition - Vector3.new(0, -6, 0) -- Y軸方向に5単位下に移動する
+ 
+    -- プレイヤーを移動する
+    Players.LocalPlayer.Character:SetPrimaryPartCFrame(CFrame.new(teleportPosition))
+end
+ 
+local function teleportToNearestPlayer()
+    local localPlayer = Players.LocalPlayer
+    local localPlayerPosition = localPlayer.Character.HumanoidRootPart.Position
+    local players = Players:GetPlayers()
+    local nearestPlayer = nil
+    local nearestDistance = math.huge
+    
+    -- 最も近いプレイヤーを見つける
+    for _, player in ipairs(players) do
+        if player ~= localPlayer then
+            local playerPosition = player.Character and player.Character.HumanoidRootPart.Position
+            if playerPosition then
+                local distance = (playerPosition - localPlayerPosition).Magnitude
+                if distance < nearestDistance and distance <= detectionRange then -- 範囲内のみ検出する
+                    nearestPlayer = player
+                    nearestDistance = distance
+                end
+            end
+        end
+    end
+    
+    -- 最も近いプレイヤーがいれば、そのプレイヤーの少し下にテレポートする
+    if nearestPlayer then
+        teleportBelowPlayer(nearestPlayer)
+    end
+end
+ 
+local function teleportLoop()
+    if isTeleporting then
+        teleportToNearestPlayer()
+    end
+end
+ 
+local function onTeleportIntervalChanged(value)
+    teleportInterval = value / 10  -- スライダーの値を0.1単位に変換してテレポートの間隔に適用する
+end
+ 
+local function onHealthChanged(health)
+    -- 体力が25%以下の場合、指定の座標にテレポートし、再び最も近いプレイヤーの下にテレポートする
+    if health <= 25 then
+        teleportBelowPlayer(teleportDestination)
+        wait(5) -- 5秒待つ
+        teleportToNearestPlayer()
+    end
+end
+ 
+local teleportToggle = KillingCheats:CreateToggle("Teleport Below Player", function(value)
+    isTeleporting = value
+    if isTeleporting then
+        -- テレポートを開始する
+        teleportLoopId = RunService.RenderStepped:Connect(teleportLoop)
+    else
+        -- テレポートを停止する
+        if teleportLoopId then
+            teleportLoopId:Disconnect()
+        end
+    end
+end)
+ 
+local teleportIntervalSlider = KillingCheats:CreateSlider("Teleport Interval", 0, 100, teleportIntervalSliderValue, false, onTeleportIntervalChanged)
+ 
+teleportToggle:Set(false)  -- 初期状態でテレポートが無効になるように設定
+ 
+-- 体力が変更されたときに呼び出されるイベントを登録する
+Players.LocalPlayer.Character.Humanoid.HealthChanged:Connect(onHealthChanged)
+ 
